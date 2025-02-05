@@ -1,0 +1,16 @@
+[Unit]
+Description=IPFS Daemon
+After=network.target
+
+[Service]
+Type=simple
+User={{ ipfs_user }}
+Group={{ ipfs_group }}
+Environment=IPFS_PATH={{ ipfs_data_dir }}
+ExecStart=/usr/local/bin/ipfs daemon
+Restart=always
+RestartSec={{ service_restart_delay }}
+LimitNOFILE={{ service_nofile_limit }}
+
+[Install]
+WantedBy=multi-user.target

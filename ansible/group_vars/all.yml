@@ -1,0 +1,79 @@
+---
+# URLs and external resources
+docker_gpg_key_url: "https://download.docker.com/linux/ubuntu/gpg"
+docker_repo_url: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+kubo_download_base_url: "https://dist.ipfs.tech/kubo"
+
+# Hippius configuration
+hippius_binary_url: "https://example.com/hippius-thebrain-latest.tar.gz"  # Replace with actual URL
+hippius_binary_name: "hippius-thebrain"
+hippius_home: /opt/hippius
+hippius_data_dir: "{{ hippius_home }}/data"
+hippius_binary_path: "{{ hippius_home }}/bin"
+hippius_ports:
+  rpc: 9944
+  p2p: 30333
+  ws: 9933
+
+# IPFS configuration
+ipfs_version: "v0.26.0"
+ipfs_user: ipfs
+ipfs_group: ipfs
+ipfs_home: /home/ipfs
+ipfs_data_dir: "{{ ipfs_home }}/.ipfs"
+ipfs_download_url: "{{ kubo_download_base_url }}/{{ ipfs_version }}/kubo_{{ ipfs_version }}_linux-amd64.tar.gz"
+ipfs_api_address: "/ip4/127.0.0.1/tcp/5001"
+ipfs_gateway_address: "/ip4/127.0.0.1/tcp/8080"
+
+# Service configuration
+service_restart_delay: 10
+service_nofile_limit: 65536
+
+# Subtensor configuration
+subtensor_image: "ghcr.io/opentensor/subtensor:latest"
+subtensor_ports:
+  rpc: 9945
+  p2p: 30334
+  ws: 9934
+subtensor_volume_path: /tmp/blockchain
+subtensor_bootnode: "/dns/bootnode.finney.chain.opentensor.ai/tcp/30333/ws/p2p/12D3KooWRwbMb85RWnT8DSXSYMWQtuDwh4LJzndoRrTDotTR5gDC"
+subtensor_chain_spec: "raw_spec_finney.json"
+subtensor_container_name: "subtensor-mainnet-lite"
+subtensor_volume_name: "mainnet-lite-volume"
+subtensor_cpu_count: 4
+subtensor_mem_limit: "40000000000"
+subtensor_memswap_limit: "80000000000"
+subtensor_peer_count: 500
+
+# Firewall configuration
+ufw_allowed_ports:
+  - port: 22
+    proto: tcp
+  - port: "{{ subtensor_ports.p2p }}"
+    proto: tcp
+  - port: "{{ subtensor_ports.rpc }}"
+    proto: tcp
+  - port: "{{ subtensor_ports.ws }}"
+    proto: tcp
+
+ufw_local_ports:
+  - 4001
+  - 5001
+  - 8080
+
+# System configuration
+system_packages:
+  - chrony
+  - ufw
+  - curl
+  - wget
+  - apt-transport-https
+  - ca-certificates
+  - software-properties-common
+  - docker-compose
+
+# Docker configuration
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io

@@ -1,0 +1,25 @@
+[Unit]
+Description=Hippius TheBrain Node
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart={{ hippius_binary_path }}/{{ hippius_binary_name }} \
+    --offchain-worker Always \
+    --validator \
+    --base-path {{ hippius_data_dir }} \
+    --port {{ hippius_ports.p2p }} \
+    --rpc-port {{ hippius_ports.rpc }} \
+    --ws-port {{ hippius_ports.ws }} \
+    --rpc-external \
+    --ws-external \
+    --rpc-cors all
+
+Restart=always
+RestartSec={{ service_restart_delay }}
+LimitNOFILE={{ service_nofile_limit }}
+
+[Install]
+WantedBy=multi-user.target

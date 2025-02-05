@@ -1,0 +1,25 @@
+---
+- name: Create directory for subtensor
+  file:
+    path: "/opt/subtensor"
+    state: directory
+    mode: '0755'
+
+- name: Create docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/subtensor/docker-compose.yml
+    mode: '0644'
+
+- name: Pull subtensor image
+  docker_image:
+    name: "{{ subtensor_image }}"
+    source: pull
+    force_source: yes
+
+- name: Start subtensor service
+  docker_compose:
+    project_src: /opt/subtensor
+    state: present
+    services:
+      - mainnet-lite

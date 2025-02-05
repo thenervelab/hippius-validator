@@ -1,0 +1,52 @@
+---
+- name: Check Ubuntu version
+  fail:
+    msg: "This playbook requires Ubuntu 24.04"
+  when: ansible_distribution != "Ubuntu" or ansible_distribution_version != "24.04"
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Upgrade all packages
+  apt:
+    upgrade: full
+    
+- name: Install required packages
+  apt:
+    name: "{{ system_packages }}"
+    state: present
+
+- name: Enable and start chrony
+  systemd:
+    name: chrony
+    state: started
+    enabled: yes
+
+- name: Configure UFW rules
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop: "{{ ufw_allowed_ports }}"
+
+- name: Configure UFW for Subtensor P2P
+  ufw:
+    rule: allow
+    port: "{{ subtensor_ports.p2p }}"
+    proto: tcp
+    direction: in
+
+- name: Configure UFW for IPFS local ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    from_ip: 127.0.0.1
+  loop: "{{ ufw_local_ports }}"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: deny
