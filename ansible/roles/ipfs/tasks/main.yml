@@ -4,17 +4,20 @@
     url: "{{ ipfs_download_url }}"
     dest: /tmp/kubo.tar.gz
     mode: '0755'
+  become: yes
 
 - name: Extract Kubo IPFS
   unarchive:
     src: /tmp/kubo.tar.gz
     dest: /tmp
     remote_src: yes
+  become: yes
 
 - name: Install Kubo IPFS
   command: bash /tmp/kubo/install.sh
   args:
     creates: /usr/local/bin/ipfs
+  become: yes
 
 - name: Create IPFS user
   user:
@@ -23,6 +26,7 @@
     shell: /bin/false
     create_home: yes
     home: "{{ ipfs_home }}"
+  become: yes
 
 - name: Create IPFS directory
   file:
@@ -31,36 +35,44 @@
     owner: "{{ ipfs_user }}"
     group: "{{ ipfs_group }}"
     mode: '0755'
+  become: yes
 
 - name: Initialize IPFS
-  command: ipfs init --profile=server
+  shell: |
+    export IPFS_PATH="{{ ipfs_data_dir }}"
+    if [ ! -f "$IPFS_PATH/config" ]; then
+      ipfs init --profile=server
+      ipfs config Addresses.API {{ ipfs_api_address }}
+      ipfs config Addresses.Gateway {{ ipfs_gateway_address }}
+    fi
   become: yes
-  become_user: "{{ ipfs_user }}"
   args:
     creates: "{{ ipfs_data_dir }}/config"
 
-- name: Configure IPFS API address
-  command: ipfs config Addresses.API "{{ ipfs_api_address }}"
+- name: Fix IPFS directory permissions
+  file:
+    path: "{{ ipfs_data_dir }}"
+    owner: "{{ ipfs_user }}"
+    group: "{{ ipfs_group }}"
+    recurse: yes
+    mode: '0755'
   become: yes
-  become_user: "{{ ipfs_user }}"
-
-- name: Configure IPFS Gateway address
-  command: ipfs config Addresses.Gateway "{{ ipfs_gateway_address }}"
-  become: yes
-  become_user: "{{ ipfs_user }}"
 
 - name: Create IPFS systemd service
   template:
     src: ipfs.service.j2
     dest: /etc/systemd/system/ipfs.service
     mode: '0644'
+  become: yes
 
 - name: Reload systemd
   systemd:
     daemon_reload: yes
+  become: yes
 
 - name: Enable and start IPFS service
   systemd:
     name: ipfs
     state: started
     enabled: yes
+  become: yes

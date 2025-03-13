@@ -47,6 +47,10 @@ ansible/
 - Configured with off-chain worker support
 - Default substrate ports (configurable)
 - Systemd service for automatic startup
+- Automatic ED25519 key management:
+  - Uses provided key if specified in `hippius_key`
+  - Generates a secure ED25519 key if none provided
+  - Stores key in the network directory with proper permissions
 
 ## Usage
 
@@ -83,6 +87,7 @@ subtensor_ports:
 
 # Hippius Configuration
 hippius_binary_url: "https://example.com/hippius-thebrain-latest.tar.gz"
+hippius_key: ""  # Optional: Provide ED25519 key in hex format
 hippius_ports:
   rpc: 9944
   p2p: 30333

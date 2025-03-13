@@ -32,6 +32,10 @@
     owner: root
     group: root
 
+# Include key management tasks
+- name: Include key management tasks
+  include_tasks: key_management.yml
+
 - name: Create Hippius service
   template:
     src: hippius.service.j2

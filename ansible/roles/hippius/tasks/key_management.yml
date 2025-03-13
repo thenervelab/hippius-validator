@@ -1,0 +1,45 @@
+---
+- name: Ensure network directory exists
+  file:
+    path: "{{ hippius_key_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Check if key exists
+  stat:
+    path: "{{ hippius_key_path }}"
+  register: key_file
+
+- name: Generate ED25519 key if not provided and not exists
+  block:
+    - name: Generate random ED25519 key
+      command: openssl genpkey -algorithm ED25519
+      register: generated_key
+      when: not key_file.stat.exists and hippius_key == ""
+
+    - name: Extract private key in hex format
+      shell: |
+        echo "{{ generated_key.stdout }}" | openssl pkey -in /dev/stdin -text | grep 'priv:' -A 2 | tail -n 2 | tr -d ' \n:' | xxd -r -p | hexdump -v -e '/1 "%02x"'
+      register: extracted_key
+      when: not key_file.stat.exists and hippius_key == ""
+
+    - name: Store generated key
+      copy:
+        content: "{{ extracted_key.stdout }}"
+        dest: "{{ hippius_key_path }}"
+        owner: root
+        group: root
+        mode: '0600'
+      when: not key_file.stat.exists and hippius_key == ""
+  when: not key_file.stat.exists and hippius_key == ""
+
+- name: Store provided key if exists
+  copy:
+    content: "{{ hippius_key }}"
+    dest: "{{ hippius_key_path }}"
+    owner: root
+    group: root
+    mode: '0600'
+  when: not key_file.stat.exists and hippius_key != ""
