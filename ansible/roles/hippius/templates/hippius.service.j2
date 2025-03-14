@@ -11,11 +11,14 @@ ExecStart={{ hippius_binary_path }}/{{ hippius_binary_name }} \
     --validator \
     --base-path {{ hippius_data_dir }} \
     --port {{ hippius_ports.p2p }} \
-    --rpc-port {{ hippius_ports.rpc }} \
-    --ws-port {{ hippius_ports.ws }} \
-    --rpc-external \
-    --ws-external \
-    --rpc-cors all
+    --rpc-cors all \
+    --database paritydb \
+    --name {{ hippius_node_name }} \
+    --telemetry-url "{{ hippius_telemetry_url }}" \
+{% if hippius_chain_spec_file is defined %}
+    --chain {{ hippius_chain_spec_file }} \
+{% endif %}
+    --node-key-file {{ hippius_key_path }}
 
 Restart=always
 RestartSec={{ service_restart_delay }}

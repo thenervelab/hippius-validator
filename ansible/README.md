@@ -62,9 +62,6 @@ ansible/
 3. Run the playbook:
 
 ```bash
-# For staging
-ansible-playbook -i inventory/staging/hosts.yml site.yml
-
 # For production
 ansible-playbook -i inventory/production/hosts.yml site.yml
 ```

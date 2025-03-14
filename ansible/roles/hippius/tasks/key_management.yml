@@ -12,27 +12,26 @@
     path: "{{ hippius_key_path }}"
   register: key_file
 
-- name: Generate ED25519 key if not provided and not exists
+- name: Generate node key using Hippius binary if not provided and not exists
   block:
-    - name: Generate random ED25519 key
-      command: openssl genpkey -algorithm ED25519
-      register: generated_key
-      when: not key_file.stat.exists and hippius_key == ""
-
-    - name: Extract private key in hex format
-      shell: |
-        echo "{{ generated_key.stdout }}" | openssl pkey -in /dev/stdin -text | grep 'priv:' -A 2 | tail -n 2 | tr -d ' \n:' | xxd -r -p | hexdump -v -e '/1 "%02x"'
-      register: extracted_key
-      when: not key_file.stat.exists and hippius_key == ""
-
-    - name: Store generated key
-      copy:
-        content: "{{ extracted_key.stdout }}"
-        dest: "{{ hippius_key_path }}"
+    - name: Ensure parent directory exists for key
+      file:
+        path: "{{ hippius_key_path | dirname }}"
+        state: directory
         owner: root
         group: root
-        mode: '0600'
+        mode: '0700'
       when: not key_file.stat.exists and hippius_key == ""
+
+    - name: Generate node key using Hippius binary
+      command: "{{ hippius_binary_path }}/{{ hippius_binary_name }} key generate-node-key --file {{ hippius_key_path }}{% if hippius_chain_spec_file is defined %} --chain {{ hippius_chain_spec_file }}{% endif %}"
+      register: generate_key_result
+      when: not key_file.stat.exists and hippius_key == ""
+
+    - name: Debug output of key generation
+      debug:
+        var: generate_key_result
+      when: not key_file.stat.exists and hippius_key == "" and generate_key_result is defined
   when: not key_file.stat.exists and hippius_key == ""
 
 - name: Store provided key if exists

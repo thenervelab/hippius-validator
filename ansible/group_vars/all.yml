@@ -5,8 +5,10 @@ docker_repo_url: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ a
 kubo_download_base_url: "https://dist.ipfs.tech/kubo"
 
 # Hippius configuration
-hippius_binary_url: "https://example.com/hippius-thebrain-latest.tar.gz"  # Replace with actual URL
-hippius_binary_name: "hippius-thebrain"
+hippius_binary_url: "http://141.94.106.80/hippius"  # Direct binary URL
+hippius_binary_name: "hippius"
+hippius_chain_spec_url: "http://141.94.106.80/premain.json"  # Chain spec URL
+hippius_chain_spec_file: "{{ hippius_home }}/premain.json"  # Local path for downloaded chain spec
 hippius_home: /opt/hippius
 hippius_data_dir: "{{ hippius_home }}/data"
 hippius_binary_path: "{{ hippius_home }}/bin"
@@ -16,6 +18,8 @@ hippius_ports:
   rpc: 9944
   p2p: 30333
   ws: 9933
+hippius_node_name: "hippius-validator"  # Default node name using hostname
+hippius_telemetry_url: "wss://telemetry.hippius.com/submit/ 0"  # Telemetry endpoint with verbosity level 0
 
 # IPFS configuration
 ipfs_version: "v0.26.0"
@@ -45,23 +49,39 @@ subtensor_volume_name: "mainnet-lite-volume"
 subtensor_cpu_count: 4
 subtensor_mem_limit: "40000000000"
 subtensor_memswap_limit: "80000000000"
-subtensor_peer_count: 500
+subtensor_peer_count: 100
 
 # Firewall configuration
 ufw_allowed_ports:
   - port: 22
     proto: tcp
+  # Subtensor ports
   - port: "{{ subtensor_ports.p2p }}"
     proto: tcp
+  - port: "{{ subtensor_ports.p2p }}"
+    proto: udp
   - port: "{{ subtensor_ports.rpc }}"
     proto: tcp
   - port: "{{ subtensor_ports.ws }}"
     proto: tcp
+  # Hippius ports
+  - port: "{{ hippius_ports.p2p }}"
+    proto: tcp
+  - port: "{{ hippius_ports.p2p }}"
+    proto: udp
+  - port: "{{ hippius_ports.rpc }}"
+    proto: tcp
+  - port: "{{ hippius_ports.ws }}"
+    proto: tcp
+  # IPFS ports
+  - port: 4001
+    proto: tcp
+  - port: 4001
+    proto: udp
 
 ufw_local_ports:
-  - 4001
-  - 5001
-  - 8080
+  - 5001  # IPFS API
+  - 8080  # IPFS Gateway
 
 # System configuration
 system_packages:
