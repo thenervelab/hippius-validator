@@ -5,9 +5,8 @@ docker_repo_url: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ a
 kubo_download_base_url: "https://dist.ipfs.tech/kubo"
 
 # Hippius configuration
-hippius_binary_url: "http://141.94.106.80/hippius"  # Direct binary URL
-hippius_binary_name: "hippius"
-hippius_chain_spec_url: "http://141.94.106.80/premain.json"  # Chain spec URL
+hippius_binary_url: "http://download.hippius.com/hippius"  # Direct binary URL
+hippius_binary_name: "hippius" # Chain spec URL
 hippius_chain_spec_file: "{{ hippius_home }}/premain.json"  # Local path for downloaded chain spec
 hippius_home: /opt/hippius
 hippius_data_dir: "{{ hippius_home }}/data"
