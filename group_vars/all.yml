@@ -7,7 +7,6 @@ kubo_download_base_url: "https://dist.ipfs.tech/kubo"
 # Hippius configuration
 hippius_binary_url: "http://download.hippius.com/hippius"  # Direct binary URL
 hippius_binary_name: "hippius" # Chain spec URL
-hippius_chain_spec_file: "{{ hippius_home }}/premain.json"  # Local path for downloaded chain spec
 hippius_home: /opt/hippius
 hippius_data_dir: "{{ hippius_home }}/data"
 hippius_binary_path: "{{ hippius_home }}/bin"
@@ -18,7 +17,7 @@ hippius_ports:
   p2p: 30333
   ws: 9933
 hippius_node_name: "hippius-validator"  # Default node name using hostname
-hippius_telemetry_url: "wss://telemetry.hippius.com/submit/ 0"  # Telemetry endpoint with verbosity level 0
+hippius_telemetry_url: "wss://telemetry.polkadot.io/submit/ 0"  # Telemetry endpoint with verbosity level 0
 
 # IPFS configuration
 ipfs_version: "v0.33.2"
