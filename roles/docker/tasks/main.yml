@@ -1,21 +1,96 @@
 ---
+- name: Install required system packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+      - gnupg
+    state: present
+    update_cache: yes
+  become: yes
+
 - name: Add Docker GPG key
   apt_key:
     url: "{{ docker_gpg_key_url }}"
     state: present
+  become: yes
 
 - name: Add Docker repository
   apt_repository:
     repo: "{{ docker_repo_url }}"
     state: present
+  become: yes
 
-- name: Install Docker packages
+- name: Update apt and install docker packages
   apt:
     name: "{{ docker_packages }}"
     state: present
+    update_cache: yes
+  become: yes
 
-- name: Ensure Docker service is enabled and started
+- name: Stop Docker service if running
+  systemd:
+    name: docker
+    state: stopped
+  become: yes
+  ignore_errors: yes
+
+- name: Remove old Docker data directory
+  file:
+    path: /var/lib/docker
+    state: absent
+  become: yes
+  ignore_errors: yes
+
+- name: Create fresh Docker data directory
+  file:
+    path: /var/lib/docker
+    state: directory
+    mode: '0711'
+  become: yes
+
+- name: Reset Docker daemon configuration
+  copy:
+    content: "{}"
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+    force: yes
+  become: yes
+
+- name: Ensure containerd service is stopped
+  systemd:
+    name: containerd
+    state: stopped
+  become: yes
+  ignore_errors: yes
+
+- name: Reset containerd state
+  file:
+    path: /var/run/containerd
+    state: absent
+  become: yes
+  ignore_errors: yes
+
+- name: Daemon reload
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Start Docker service
   systemd:
     name: docker
     state: started
     enabled: yes
+  become: yes
+
+- name: Wait for Docker to be ready
+  wait_for:
+    timeout: 30
+
+- name: Verify Docker is running
+  command: docker info
+  register: docker_info
+  changed_when: false
+  become: yes

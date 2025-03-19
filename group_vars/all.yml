@@ -21,7 +21,7 @@ hippius_node_name: "hippius-validator"  # Default node name using hostname
 hippius_telemetry_url: "wss://telemetry.hippius.com/submit/ 0"  # Telemetry endpoint with verbosity level 0
 
 # IPFS configuration
-ipfs_version: "v0.26.0"
+ipfs_version: "v0.33.2"
 ipfs_user: ipfs
 ipfs_group: ipfs
 ipfs_home: /home/ipfs
