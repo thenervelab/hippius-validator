@@ -1,0 +1,175 @@
+---
+- name: Stop Hippius service
+  systemd:
+    name: hippius
+    state: stopped
+  become: yes
+
+- name: Ensure all Hippius processes are stopped
+  shell: "pkill -f '{{ hippius_binary_name }}' || true"
+  become: yes
+  ignore_errors: yes
+
+- name: Wait for processes to fully stop
+  wait_for:
+    timeout: 5
+
+- name: Create key injection script
+  copy:
+    dest: /tmp/manual_inject_keys.sh
+    content: |
+      #!/bin/bash
+      set -ex
+      
+      echo "Hippius key injection script"
+      cd {{ hippius_binary_path }}
+      
+      # Start temporary node WITHOUT validator flag but WITH author interface enabled
+      echo "Starting temporary node..."
+      nohup ./hippius \
+        --base-path {{ hippius_data_dir }} \
+        --database paritydb \
+        --name hippius-validator-temp \
+        --telemetry-url "wss://telemetry.hippius.com/submit/ 0" \
+        --chain hippius \
+        --unsafe-rpc-external \
+        --rpc-methods Unsafe \
+        --rpc-cors all \
+        --rpc-port {{ hippius_ports.rpc }} \
+        --listen-addr /ip4/0.0.0.0/tcp/30333 \
+        --node-key-file {{ hippius_key_path }} > /tmp/hippius_temp.log 2>&1 &
+      
+      NODE_PID=$!
+      echo "Node started with PID: $NODE_PID"
+      
+      # Wait for RPC to be available
+      echo "Waiting for RPC endpoint to become available..."
+      attempt=0
+      max_attempts=30
+      
+      while [ $attempt -lt $max_attempts ]; do
+        if curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","id":1,"method":"system_health"}' http://localhost:{{ hippius_ports.rpc }}/ | grep -q "result"; then
+          echo "RPC endpoint is available!"
+          break
+        fi
+        
+        attempt=$((attempt+1))
+        echo "Attempt $attempt of $max_attempts. Waiting for RPC endpoint..."
+        sleep 5
+        
+        # Check if process is still running
+        if ! ps -p $NODE_PID > /dev/null; then
+          echo "Node process died! Checking logs:"
+          cat /tmp/hippius_temp.log
+          exit 1
+        fi
+      done
+      
+      if [ $attempt -eq $max_attempts ]; then
+        echo "RPC endpoint did not become available after $(($max_attempts * 5)) seconds."
+        echo "Node log:"
+        cat /tmp/hippius_temp.log
+        kill $NODE_PID || true
+        exit 1
+      fi
+      
+      # Extract keys directly in suri format
+      echo "Running key inspection for keypairs..."
+      
+      # SR25519 key for most methods
+      SR_OUTPUT=$(./hippius key inspect --scheme sr25519 --output-type json "{{ hippius_hotkey_mnemonic }}")
+      echo "SR25519 raw output: $SR_OUTPUT"
+      SR_PUBKEY=$(echo "$SR_OUTPUT" | grep -o '"publicKey": *"[^"]*"' | cut -d: -f2 | tr -d ' "')
+      echo "SR25519 Public Key: $SR_PUBKEY"
+      
+      # ED25519 key for GRAN
+      ED_OUTPUT=$(./hippius key inspect --scheme ed25519 --output-type json "{{ hippius_hotkey_mnemonic }}")
+      echo "ED25519 raw output: $ED_OUTPUT"
+      ED_PUBKEY=$(echo "$ED_OUTPUT" | grep -o '"publicKey": *"[^"]*"' | cut -d: -f2 | tr -d ' "')
+      echo "ED25519 Public Key: $ED_PUBKEY"
+      
+      # If keys are empty, try alternative parsing method
+      if [ -z "$SR_PUBKEY" ]; then
+        echo "Failed to extract SR25519 key, trying alternative method..."
+        SR_PUBKEY=$(echo "$SR_OUTPUT" | python3 -c "import sys, json; print(json.load(sys.stdin)['publicKey'])")
+        echo "SR25519 Public Key (alternative method): $SR_PUBKEY"
+      fi
+      
+      if [ -z "$ED_PUBKEY" ]; then
+        echo "Failed to extract ED25519 key, trying alternative method..."
+        ED_PUBKEY=$(echo "$ED_OUTPUT" | python3 -c "import sys, json; print(json.load(sys.stdin)['publicKey'])")
+        echo "ED25519 Public Key (alternative method): $ED_PUBKEY"
+      fi
+      
+      # Insert keys via RPC
+      echo "Injecting IMON key..."
+      IMON_RESULT=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_insertKey\",\"params\":[\"imon\",\"{{ hippius_hotkey_mnemonic }}\",\"$SR_PUBKEY\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$IMON_RESULT"
+      
+      echo "Injecting BABE key..."
+      BABE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_insertKey\",\"params\":[\"babe\",\"{{ hippius_hotkey_mnemonic }}\",\"$SR_PUBKEY\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$BABE_RESULT"
+      
+      echo "Injecting ROLE key..."
+      ROLE_RESULT=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_insertKey\",\"params\":[\"role\",\"{{ hippius_hotkey_mnemonic }}\",\"$SR_PUBKEY\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$ROLE_RESULT"
+      
+      echo "Injecting ACCO key..."
+      ACCO_RESULT=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_insertKey\",\"params\":[\"acco\",\"{{ hippius_hotkey_mnemonic }}\",\"$SR_PUBKEY\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$ACCO_RESULT"
+      
+      echo "Injecting GRAN key..."
+      GRAN_RESULT=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_insertKey\",\"params\":[\"gran\",\"{{ hippius_hotkey_mnemonic }}\",\"$ED_PUBKEY\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$GRAN_RESULT"
+      
+      echo "Injecting HIPS key..."
+      HIPS_RESULT=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_insertKey\",\"params\":[\"hips\",\"{{ hippius_hotkey_mnemonic }}\",\"$SR_PUBKEY\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$HIPS_RESULT"
+      
+      # Verify individual keys were inserted correctly
+      echo "Verifying ROLE key..."
+      ROLE_CHECK=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_hasKey\",\"params\":[\"$SR_PUBKEY\",\"role\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$ROLE_CHECK"
+      
+      echo "Verifying GRAN key..."
+      GRAN_CHECK=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_hasKey\",\"params\":[\"$ED_PUBKEY\",\"gran\"]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$GRAN_CHECK"
+      
+      # Check all session keys
+      echo "Retrieving all session keys..."
+      SESSION_KEYS=$(curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_rotateKeys\",\"params\":[]}" http://localhost:{{ hippius_ports.rpc }}/)
+      echo "$SESSION_KEYS"
+      
+      # Stop the node
+      echo "Stopping node..."
+      kill $NODE_PID
+      
+      echo "Key injection completed."
+      exit 0
+    mode: '0755'
+  become: yes
+  
+- name: Run manual key injection script
+  command: /tmp/manual_inject_keys.sh
+  register: injection_result
+  become: yes
+  ignore_errors: yes
+  
+- name: Display injection result
+  debug:
+    var: injection_result.stdout_lines
+    
+- name: Ensure all Hippius processes are stopped again
+  shell: "pkill -f '{{ hippius_binary_name }}' || true"
+  become: yes
+  ignore_errors: yes
+
+- name: Wait for processes to fully stop
+  wait_for:
+    timeout: 5
+    
+- name: Start Hippius service
+  systemd:
+    name: hippius
+    state: started
+  become: yes 

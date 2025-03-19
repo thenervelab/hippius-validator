@@ -1,0 +1,17 @@
+---
+- name: Manually inject Hippius Keys
+  hosts: ipfs_nodes
+  gather_facts: yes
+  become: yes
+  tasks:
+    - name: Include role-specific variables
+      include_vars:
+        dir: ansible/group_vars
+        
+    - name: Check if hippius_hotkey_mnemonic is provided
+      fail:
+        msg: "Please provide hippius_hotkey_mnemonic using -e or in the inventory/group_vars"
+      when: hippius_hotkey_mnemonic is not defined or hippius_hotkey_mnemonic == ""
+      
+    - name: Include manual key injection tasks
+      include_tasks: roles/hippius/tasks/manual_key_injection.yml 

@@ -66,6 +66,16 @@ ansible/
 ansible-playbook -i inventory/production/hosts.yml site.yml
 ```
 
+
+``` 
+
+to inject keys manually, run the following command:
+ansible-playbook -i inventory/production/hosts.yml manual-keys.yml -e "hippius_hotkey_mnemonic='YOUR SEED WORDS HERE'"
+
+```
+
+
+
 ## Configuration
 
 ### Important Variables
@@ -126,3 +136,6 @@ docker-compose -f /opt/subtensor/docker-compose.yml logs -f
 # Hippius logs
 journalctl -u hippius -f
 ```
+
+
+
