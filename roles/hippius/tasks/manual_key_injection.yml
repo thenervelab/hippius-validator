@@ -1,6 +1,9 @@
 ---
-# No need to stop service, it's not started yet in the new workflow
-# Just ensure no stray processes are running
+- name: Stop Hippius service
+  systemd:
+    name: hippius
+    state: stopped
+  become: yes
 
 - name: Ensure all Hippius processes are stopped
   shell: "pkill -f '{{ hippius_binary_name }}' || true"
