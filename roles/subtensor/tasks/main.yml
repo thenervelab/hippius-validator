@@ -71,6 +71,66 @@
     name: "{{ subtensor_image }}"
     source: pull
     force_source: yes
+  ignore_errors: yes
+  register: pull_result
+
+- name: Check if subtensor image was pulled successfully
+  debug:
+    msg: "Failed to pull subtensor image. Will try to build it."
+  when: pull_result is failed
+
+- name: Install Docker Buildx (if pull failed)
+  block:
+    - name: Create ~/.docker/cli-plugins directory
+      file:
+        path: ~/.docker/cli-plugins
+        state: directory
+        mode: '0755'
+      become: yes
+      when: pull_result is failed
+      
+    - name: Download Docker Buildx
+      get_url:
+        url: https://github.com/docker/buildx/releases/download/v0.12.1/buildx-v0.12.1.linux-amd64
+        dest: ~/.docker/cli-plugins/docker-buildx
+        mode: '0755'
+      become: yes
+      when: pull_result is failed
+      
+    - name: Create Dockerfile for subtensor
+      copy:
+        dest: /opt/subtensor/Dockerfile
+        content: |
+          FROM ubuntu:22.04
+          
+          # Install dependencies
+          RUN apt-get update && \
+              apt-get install -y git build-essential curl libssl-dev pkg-config clang
+          
+          # Install Rust
+          RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          ENV PATH="/root/.cargo/bin:${PATH}"
+          
+          # Clone and build subtensor
+          RUN git clone https://github.com/opentensor/subtensor.git
+          WORKDIR /subtensor
+          RUN cargo build --release
+          
+          # Setup the runtime
+          VOLUME ["/data"]
+          EXPOSE 9944 9933 30333
+          
+          ENTRYPOINT ["/subtensor/target/release/node-subtensor"]
+        mode: '0644'
+      become: yes
+      when: pull_result is failed
+      
+    - name: Build subtensor image for amd64
+      command: >
+        docker buildx build --platform linux/amd64 -t opentensor/subtensor:latest /opt/subtensor
+      become: yes
+      when: pull_result is failed
+  when: pull_result is failed
 
 - name: Start subtensor service
   community.docker.docker_compose_v2:

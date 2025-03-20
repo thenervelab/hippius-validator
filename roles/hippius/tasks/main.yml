@@ -30,23 +30,39 @@
 - name: Include key management tasks
   include_tasks: key_management.yml
 
-# Include key injection tasks if hotkey mnemonic is provided
-- name: Include key injection tasks
-  include_tasks: inject_keys.yml
-  when: hippius_hotkey_mnemonic != ""
-
+# Create the service before injecting keys
 - name: Create Hippius service
   template:
     src: hippius.service.j2
     dest: /etc/systemd/system/hippius.service
     mode: '0644'
+  when: skip_key_injection is not defined or not skip_key_injection
 
 - name: Reload systemd
   systemd:
     daemon_reload: yes
+  when: skip_key_injection is not defined or not skip_key_injection
 
+# Include key injection tasks after service is created but before starting
+- name: Include key injection tasks
+  include_tasks: inject_keys.yml
+  when: 
+    - hippius_hotkey_mnemonic != ""
+    - skip_key_injection is not defined or not skip_key_injection
+
+# Finally, start the service after keys are injected
 - name: Enable and start Hippius service
   systemd:
     name: hippius
     state: started
     enabled: yes
+  register: service_start_result
+  ignore_errors: no
+  when: skip_key_injection is not defined or not skip_key_injection
+  
+- name: Display service start result (if it failed)
+  debug:
+    msg: "Service start failed: {{ service_start_result }}"
+  when: 
+    - service_start_result is failed
+    - skip_key_injection is not defined or not skip_key_injection

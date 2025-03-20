@@ -34,7 +34,7 @@ service_restart_delay: 10
 service_nofile_limit: 65536
 
 # Subtensor configuration
-subtensor_image: "ghcr.io/opentensor/subtensor:latest"
+subtensor_image: "ghcr.io/opentensor/subtensor:v2.0.7"
 subtensor_ports:
   rpc: 9945
   p2p: 30334
