@@ -29,14 +29,10 @@
       nohup ./hippius \
         --base-path {{ hippius_data_dir }} \
         --database paritydb \
-        --name hippius-validator-temp \
-        --telemetry-url "wss://telemetry.hippius.com/submit/ 0" \
+        --name hippius-validator \
         --chain hippius \
         --unsafe-rpc-external \
-        --rpc-methods Unsafe \
         --rpc-cors all \
-        --rpc-port {{ hippius_ports.rpc }} \
-        --listen-addr /ip4/0.0.0.0/tcp/30333 \
         --node-key-file {{ hippius_key_path }} > /tmp/hippius_temp.log 2>&1 &
       
       NODE_PID=$!
