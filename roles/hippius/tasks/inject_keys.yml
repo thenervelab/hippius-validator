@@ -70,7 +70,7 @@
         --database paritydb \
         --name hippius-validator \
         --chain hippius \
-        --unsafe-rpc-external \
+        --rpc-methods=Unsafe \
         --rpc-cors all \
         --node-key-file {{ hippius_key_path }} > /tmp/hippius_temp.log 2>&1 &
       
