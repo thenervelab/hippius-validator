@@ -11,29 +11,36 @@
     update_cache: yes
   become: yes
 
-- name: Add Docker GPG key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
-  become: yes
+# - name: Add Docker GPG key
+#   apt_key:
+#     url: https://download.docker.com/linux/ubuntu/gpg
+#     state: present
+#   become: yes
 
-- name: Add Docker repository
-  apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-    state: present
-  become: yes
+# - name: Add Docker repository
+#   apt_repository:
+#     repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+#     state: present
+#   become: yes
 
-- name: Update apt and install docker-ce
-  apt:
-    name: docker-ce
-    state: present
-    update_cache: yes
-  become: yes
+# - name: Update apt and install docker-ce
+#   apt:
+#     name: docker-ce
+#     state: present
+#     update_cache: yes
+#   become: yes
 
-- name: Install docker-compose-plugin
-  apt:
-    name: docker-compose-plugin
-    state: present
+# - name: Install docker-compose-plugin
+#   apt:
+#     name: docker-compose-plugin
+#     state: present
+#   become: yes
+
+- name: Check Docker service status
+  command: systemctl status docker
+  register: docker_status
+  changed_when: false
+  ignore_errors: yes
   become: yes
 
 - name: Reset Docker service
@@ -42,6 +49,7 @@
     state: stopped
     daemon_reload: yes
   become: yes
+  when: docker_status.rc == 0
 
 - name: Start Docker service
   systemd:
@@ -49,22 +57,27 @@
     state: started
     enabled: yes
   become: yes
+  register: docker_start_result
+  ignore_errors: yes
 
 - name: Wait for Docker to be ready
   wait_for:
     timeout: 30
+  when: docker_start_result.rc == 0 and (skip_subtensor is not defined or not skip_subtensor)
 
 - name: Create directory for subtensor
   file:
     path: "/opt/subtensor"
     state: directory
     mode: '0755'
+  when: skip_subtensor is not defined or not skip_subtensor
 
 - name: Create docker-compose.yml
   template:
     src: docker-compose.yml.j2
     dest: /opt/subtensor/docker-compose.yml
     mode: '0644'
+  when: skip_subtensor is not defined or not skip_subtensor
 
 - name: Pull subtensor image
   docker_image:
@@ -73,11 +86,12 @@
     force_source: yes
   ignore_errors: yes
   register: pull_result
+  when: skip_subtensor is not defined or not skip_subtensor
 
 - name: Check if subtensor image was pulled successfully
   debug:
     msg: "Failed to pull subtensor image. Will try to build it."
-  when: pull_result is failed
+  when: (skip_subtensor is not defined or not skip_subtensor) and pull_result is failed
 
 - name: Install Docker Buildx (if pull failed)
   block:
@@ -130,11 +144,32 @@
         docker buildx build --platform linux/amd64 -t opentensor/subtensor:latest /opt/subtensor
       become: yes
       when: pull_result is failed
-  when: pull_result is failed
+  when: (skip_subtensor is not defined or not skip_subtensor) and pull_result is failed
 
 - name: Start subtensor service
-  community.docker.docker_compose_v2:
-    project_src: /opt/subtensor
-    state: present
-    services:
-      - mainnet-lite
+  shell: cd /opt/subtensor && docker-compose up -d mainnet-lite
+  become: yes
+  when: skip_subtensor is not defined or not skip_subtensor
+
+- name: Verify subtensor service is running
+  shell: docker ps | grep subtensor
+  register: subtensor_status
+  ignore_errors: yes
+  changed_when: false
+  become: yes
+  when: skip_subtensor is not defined or not skip_subtensor
+
+- name: Display subtensor status
+  debug:
+    var: subtensor_status.stdout
+  when: skip_subtensor is not defined or not skip_subtensor and subtensor_status.rc == 0
+
+- name: Check if we should proceed despite Docker failure
+  set_fact:
+    skip_subtensor: true
+  when: docker_start_result.rc is defined and docker_start_result.rc != 0
+  
+- name: Display Docker failure warning
+  debug:
+    msg: "Docker failed to start. Skipping subtensor deployment. Check Docker service logs for details."
+  when: skip_subtensor is defined and skip_subtensor

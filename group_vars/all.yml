@@ -97,3 +97,7 @@ docker_packages:
   - docker-ce
   - docker-ce-cli
   - containerd.io
+
+# Error handling settings
+strict_docker: false  # Set to false to continue playbook execution even if Docker fails
+skip_subtensor: false # Set to true to skip subtensor deployment entirely

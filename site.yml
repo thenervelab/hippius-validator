@@ -5,7 +5,7 @@
 
   roles:
     - common
-    - docker
+    #- { role: docker, when: skip_docker is not defined or not skip_docker }
     - ipfs
-    - subtensor
+    - { role: subtensor, when: skip_subtensor is not defined or not skip_subtensor }
     - hippius

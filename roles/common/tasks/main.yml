@@ -18,6 +18,84 @@
     name: "{{ system_packages }}"
     state: present
 
+# Docker installation steps - Cleanup and fresh install
+- name: Remove any existing Docker repository files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/etc/apt/sources.list.d/docker.list"
+    - "/etc/apt/keyrings/docker.gpg"
+    - "/usr/share/keyrings/docker-archive-keyring.gpg"
+
+- name: Ensure universe repository is enabled
+  apt_repository:
+    repo: "deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} universe"
+    state: present
+
+- name: Install Docker from Ubuntu repository
+  apt:
+    name: docker.io
+    state: present
+    update_cache: yes
+
+# Install required Docker Python modules
+- name: Install Python packages for Docker
+  apt:
+    name:
+      - python3-docker
+      - python3-pip
+    state: present
+
+# Simplify Docker Compose installation
+- name: Remove any existing Docker Compose installations
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/usr/bin/docker-compose"
+    - "/usr/local/bin/docker-compose"
+    - "~/.docker/cli-plugins/docker-compose"
+    - "/usr/local/lib/docker/cli-plugins/docker-compose"
+
+- name: Install Docker Compose
+  get_url:
+    url: https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-linux-x86_64
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+    force: yes
+    
+- name: Install pip Docker modules
+  pip:
+    name:
+      - docker
+      - docker-compose
+    state: present
+
+- name: Create symbolic link for docker-compose
+  file:
+    src: /usr/local/bin/docker-compose
+    dest: /usr/bin/docker-compose
+    state: link
+    force: yes
+
+- name: Verify Docker Compose installation
+  command: docker-compose --version
+  register: compose_version
+  changed_when: false
+  ignore_errors: yes
+
+- name: Display Docker Compose version
+  debug:
+    var: compose_version.stdout
+  when: compose_version.rc == 0
+
+- name: Enable and start Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
 - name: Enable and start chrony
   systemd:
     name: chrony
@@ -50,3 +128,5 @@
   ufw:
     state: enabled
     policy: deny
+
+

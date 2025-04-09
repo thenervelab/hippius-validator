@@ -1,4 +1,49 @@
 ---
+# Pre-installation checks
+- name: Check kernel version
+  shell: uname -r
+  register: kernel_version
+  changed_when: false
+
+- name: Display kernel version
+  debug:
+    var: kernel_version.stdout
+
+- name: Check required kernel modules
+  shell: lsmod | grep -E 'overlay|br_netfilter'
+  register: kernel_modules
+  changed_when: false
+  ignore_errors: yes
+
+- name: Display kernel modules
+  debug:
+    var: kernel_modules.stdout_lines
+  when: kernel_modules is succeeded
+
+- name: Ensure kernel modules are loaded
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  become: yes
+  with_items:
+    - overlay
+    - br_netfilter
+  ignore_errors: yes
+
+- name: Check disk space
+  shell: df -h / | awk 'NR==2 {print $5}' | sed 's/%//'
+  register: disk_usage
+  changed_when: false
+
+- name: Display disk usage
+  debug:
+    msg: "Disk usage: {{ disk_usage.stdout }}%"
+
+- name: Warn if disk space is low
+  debug:
+    msg: "WARNING: Low disk space detected ({{ disk_usage.stdout }}% used). Docker requires sufficient disk space to operate."
+  when: disk_usage.stdout|int > 80
+
 - name: Install required system packages
   apt:
     name:
@@ -84,6 +129,111 @@
     state: started
     enabled: yes
   become: yes
+  register: docker_start_result
+  ignore_errors: yes
+
+- name: Check Docker service status if start failed
+  command: systemctl status docker
+  register: docker_status
+  become: yes
+  when: docker_start_result is failed
+  ignore_errors: yes
+  
+- name: Display Docker service status
+  debug:
+    var: docker_status.stdout_lines
+  when: docker_start_result is failed
+
+- name: Check Docker service logs
+  command: journalctl -xeu docker.service --no-pager -n 50
+  register: docker_logs
+  become: yes
+  when: docker_start_result is failed
+  ignore_errors: yes
+  
+- name: Display Docker service logs
+  debug:
+    var: docker_logs.stdout_lines
+  when: docker_start_result is failed
+
+- name: Check for common Docker issues
+  command: dmesg | grep -i docker
+  register: dmesg_docker
+  become: yes
+  when: docker_start_result is failed
+  ignore_errors: yes
+  
+- name: Display relevant dmesg output
+  debug:
+    var: dmesg_docker.stdout_lines
+  when: docker_start_result is failed
+
+# Attempt fallback installation if Docker failed
+- name: Try fallback Docker installation
+  block:
+    - name: Remove Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: absent
+        purge: yes
+      become: yes
+      
+    - name: Remove Docker files and directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /var/lib/docker
+        - /etc/docker
+        - /var/run/docker.sock
+        - /usr/local/bin/docker-compose
+      become: yes
+      
+    - name: Download official Docker installation script
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+      become: yes
+      
+    - name: Run the official Docker installation script
+      command: sh /tmp/get-docker.sh
+      register: docker_install_script
+      become: yes
+      
+    - name: Display Docker installation script output
+      debug:
+        var: docker_install_script.stdout_lines
+        
+    - name: Start Docker service (fallback)
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      become: yes
+      register: docker_fallback_result
+      
+    - name: Set fallback success status
+      set_fact:
+        docker_fallback_success: "{{ docker_fallback_result is success }}"
+        
+  when: docker_start_result is failed
+  ignore_errors: yes
+        
+- name: Display fallback installation status
+  debug:
+    msg: "Fallback Docker installation {{ 'succeeded' if docker_fallback_success | default(false) else 'failed' }}"
+  when: docker_start_result is failed and docker_fallback_success is defined
+
+- name: Fail when Docker cannot start (after fallback)
+  fail:
+    msg: "Docker service failed to start even after fallback installation. Please check the logs above for details."
+  when: docker_start_result is failed and (docker_fallback_success is not defined or not docker_fallback_success) and strict_docker | default(true)
 
 - name: Wait for Docker to be ready
   wait_for:

@@ -71,6 +71,7 @@
         --name hippius-validator \
         --chain hippius \
         --rpc-methods=Unsafe \
+        --pruning archive \
         --rpc-cors all \
         --node-key-file {{ hippius_key_path }} > /tmp/hippius_temp.log 2>&1 &
       

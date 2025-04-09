@@ -29,6 +29,7 @@
       nohup ./hippius \
         --base-path {{ hippius_data_dir }} \
         --database paritydb \
+        --pruning archive \
         --name hippius-validator \
         --chain hippius \
         --rpc-methods=Unsafe \
